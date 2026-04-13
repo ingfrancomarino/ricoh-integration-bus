@@ -24,6 +24,15 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddScoped<ITenantService, TenantService>();
 
+// DI — Part 2
+builder.Services.AddScoped<IValidationHook, DefaultValidationHook>();
+builder.Services.AddScoped<IOrderProcessor, OrderProcessor>();
+builder.Services.AddScoped<IDynamicFilterService, DynamicFilterService>();
+builder.Services.AddHttpClient<IExternalDispatcher, ExternalDispatcher>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["ExternalApi:BaseUrl"] ?? "https://external-api.example.com");
+});
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())

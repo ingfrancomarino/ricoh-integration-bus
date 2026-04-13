@@ -17,20 +17,19 @@ public class TenantService : ITenantService
     /// The unique identifier of the tenant. Must not be <c>null</c> or empty.
     /// </param>
     /// <returns>
-    /// A read-only list of user names belonging to the tenant.
-    /// Returns an empty list if the tenant exists but has no users,
-    /// or if the tenant is not found.
+    /// A list of user names belonging to the tenant.
+    /// Returns an empty list if the tenant is not found.
     /// </returns>
     /// <exception cref="ArgumentException">
     /// Thrown when <paramref name="tenantId"/> is <c>null</c> or an empty string.
     /// </exception>
-    public Task<IReadOnlyList<string>> GetFakeUserNamesByTenantAsync(string tenantId)
+    public Task<List<string>> GetFakeUserNamesByTenantAsync(string tenantId)
     {
         if (string.IsNullOrEmpty(tenantId))
             throw new ArgumentException("Tenant ID must not be null or empty.", nameof(tenantId));
 
-        IReadOnlyList<string> result = _fakeData.TryGetValue(tenantId, out var users)
-            ? users
+        var result = _fakeData.TryGetValue(tenantId, out var users)
+            ? new List<string>(users)
             : [];
 
         return Task.FromResult(result);

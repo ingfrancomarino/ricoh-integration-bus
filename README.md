@@ -45,3 +45,25 @@ dotnet run --project src/IntegrationBus.Api
 # Run tests
 dotnet test
 ```
+
+## External API Configuration
+
+The dispatcher sends filtered orders to an external provider API. The base URL is configurable via `appsettings`:
+
+```json
+"ExternalApi": {
+  "BaseUrl": "https://your-api.com"
+}
+```
+
+**In development** (`appsettings.Development.json`), the URL points to `http://localhost:5083` by default, which routes requests to the built-in mock endpoint `POST /mock/orders`. This allows the full pipeline to run locally without any external dependency.
+
+To use a real external API, update `appsettings.Development.json` (or set the environment variable `ExternalApi__BaseUrl`) before running:
+
+```json
+"ExternalApi": {
+  "BaseUrl": "https://your-real-api.com"
+}
+```
+
+The mock endpoint at `POST /mock/orders` will remain available but won't be called.

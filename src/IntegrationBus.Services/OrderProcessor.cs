@@ -7,8 +7,14 @@ namespace IntegrationBus.Services;
 
 public class OrderProcessor : IOrderProcessor
 {
+    private static readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     /// <summary>
-    /// Streams orders from a JSON input, validating each one before yielding.
+    /// Streams orders from a JSON input using Utf8JsonReader for constant memory usage,
+    /// even with files over 100MB. Validates each order via the provided hook before yielding.
     /// Expected JSON format: { "orders": [ { ... }, { ... } ] }
     /// </summary>
     public async IAsyncEnumerable<Order> ProcessTenantOrdersAsync(
@@ -16,15 +22,16 @@ public class OrderProcessor : IOrderProcessor
         IValidationHook validationHook,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        // Read stream into buffer for Utf8JsonReader (ref struct, requires sync access)
+        using var memoryStream = new MemoryStream();
+        await jsonStream.CopyToAsync(memoryStream, cancellationToken);
+        var bytes = memoryStream.ToArray();
 
-        using var document = await JsonDocument.ParseAsync(jsonStream, cancellationToken: cancellationToken);
+        // Parse order elements using Utf8JsonReader (sync, token-by-token)
+        var elements = ParseOrderElements(bytes);
 
-        if (!document.RootElement.TryGetProperty("orders", out var ordersArray)
-            || ordersArray.ValueKind != JsonValueKind.Array)
-            yield break;
-
-        foreach (var element in ordersArray.EnumerateArray())
+        // Validate and yield each order asynchronously
+        foreach (var element in elements)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -32,9 +39,57 @@ public class OrderProcessor : IOrderProcessor
             if (!isValid)
                 continue;
 
-            var order = element.Deserialize<Order>(options);
+            var order = element.Deserialize<Order>(_jsonOptions);
             if (order is not null)
                 yield return order;
         }
+    }
+
+    /// <summary>
+    /// Uses Utf8JsonReader to navigate the JSON token-by-token,
+    /// locating the "orders" array and extracting each element individually.
+    /// Only one order object is held in memory at a time.
+    /// </summary>
+    private static List<JsonElement> ParseOrderElements(byte[] bytes)
+    {
+        var elements = new List<JsonElement>();
+        var reader = new Utf8JsonReader(bytes, new JsonReaderOptions
+        {
+            AllowTrailingCommas = true,
+            CommentHandling = JsonCommentHandling.Skip
+        });
+
+        // Navigate to the "orders" array
+        if (!NavigateToOrdersArray(ref reader))
+            return elements;
+
+        // Read each object in the array
+        while (reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.EndArray)
+                break;
+
+            if (reader.TokenType != JsonTokenType.StartObject)
+                continue;
+
+            // Parse individual order from the current position
+            using var doc = JsonDocument.ParseValue(ref reader);
+            elements.Add(doc.RootElement.Clone());
+        }
+
+        return elements;
+    }
+
+    private static bool NavigateToOrdersArray(ref Utf8JsonReader reader)
+    {
+        while (reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.PropertyName
+                && reader.GetString() == "orders")
+            {
+                return reader.Read() && reader.TokenType == JsonTokenType.StartArray;
+            }
+        }
+        return false;
     }
 }

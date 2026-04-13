@@ -19,6 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\IntegrationBus.Services\IntegrationBus.Services.csproj" />
     <ProjectReference Include="..\..\src\IntegrationBus.Core\IntegrationBus.Core.csproj" />
+    <ProjectReference Include="..\..\src\IntegrationBus.Api\IntegrationBus.Api.csproj" />
   </ItemGroup>
 
 </Project>

@@ -45,7 +45,8 @@ public class ExternalDispatcher : IExternalDispatcher
 
             await _pipeline.ExecuteAsync(async token =>
             {
-                await _httpClient.PostAsJsonAsync("/api/orders", order, token);
+                var response = await _httpClient.PostAsJsonAsync("/mock/orders", order, token);
+                response.EnsureSuccessStatusCode();
             }, cts.Token);
         }
         finally
